@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Develops | DevConstellation</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="nav" id="nav">
+        <div class="nav__container">
+            <a href="#" class="nav__logo">
+                <svg class="nav__logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                <span class="nav__logo-text">AI-Develops</span>
+            </a>
+            <div class="nav__links">
+                <a href="#projects" class="nav__link">Projects</a>
+                <a href="#activity" class="nav__link">Activity</a>
+                <a href="#contributors" class="nav__link">Contributors</a>
+            </div>
+            <div class="nav__actions">
+                <a href="https://github.com/AI-Develops" target="_blank" rel="noopener" class="nav__github">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                </a>
+                <button class="nav__theme" id="themeToggle" aria-label="Toggle theme">
+                    <svg class="nav__theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="5"/>
+                        <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                    </svg>
+                    <svg class="nav__theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                    </svg>
+                </button>
+            </div>
+            <button class="nav__mobile-toggle" id="mobileToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <main>
+        <section class="hero">
+            <div class="hero__bg">
+                <div class="hero__gradient"></div>
+                <canvas id="heroCanvas"></canvas>
+            </div>
+            <div class="hero__content">
+                <div class="hero__badge">
+                    <span class="hero__badge-dot"></span>
+                    Open Source Collective
+                </div>
+                <h1 class="hero__title">
+                    <span class="hero__title-line">Building the future</span>
+                    <span class="hero__title-line hero__title-line--accent">one commit at a time</span>
+                </h1>
+                <p class="hero__description">
+                    Explore our constellation of web projects, crafted with modern technologies 
+                    and hosted seamlessly via GitHub Pages.
+                </p>
+                <div class="hero__stats" id="heroStats">
+                    <div class="hero__stat">
+                        <span class="hero__stat-value" data-count="0">0</span>
+                        <span class="hero__stat-label">Projects</span>
+                    </div>
+                    <div class="hero__stat">
+                        <span class="hero__stat-value" data-count="0">0</span>
+                        <span class="hero__stat-label">Contributors</span>
+                    </div>
+                    <div class="hero__stat">
+                        <span class="hero__stat-value" data-count="0">0</span>
+                        <span class="hero__stat-label">Commits</span>
+                    </div>
+                </div>
+                <div class="hero__actions">
+                    <a href="#projects" class="hero__btn hero__btn--primary">
+                        <span>Explore Projects</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+                    <a href="https://github.com/AI-Develops" target="_blank" rel="noopener" class="hero__btn hero__btn--secondary">
+                        <svg viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                        </svg>
+                        <span>View on GitHub</span>
+                    </a>
+                </div>
+            </div>
+            <div class="hero__scroll-indicator">
+                <span>Scroll to explore</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14M19 12l-7 7-7-7"/>
+                </svg>
+            </div>
+        </section>
+
+        <section class="projects" id="projects">
+            <div class="projects__container">
+                <header class="projects__header">
+                    <div class="projects__header-content">
+                        <span class="projects__label">Our Work</span>
+                        <h2 class="projects__title">Project Constellation</h2>
+                        <p class="projects__subtitle">
+                            Each project is a star in our development universe. 
+                            Click to explore the live demos.
+                        </p>
+                    </div>
+                    <div class="projects__filter">
+                        <button class="projects__filter-btn active" data-filter="all">All</button>
+                        <button class="projects__filter-btn" data-filter="featured">Featured</button>
+                        <button class="projects__filter-btn" data-filter="recent">Recent</button>
+                    </div>
+                </header>
+                <div class="projects__grid" id="projectsGrid">
+                    <div class="projects__loader">
+                        <div class="projects__loader-spinner"></div>
+                        <span>Loading repositories...</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="activity" id="activity">
+            <div class="activity__container">
+                <header class="activity__header">
+                    <span class="activity__label">Live Feed</span>
+                    <h2 class="activity__title">Contribution Activity</h2>
+                    <p class="activity__subtitle">
+                        Real-time visualization of commits across all repositories
+                    </p>
+                </header>
+                <div class="activity__graph-container">
+                    <div class="activity__months" id="activityMonths"></div>
+                    <div class="activity__graph" id="activityGraph">
+                        <div class="activity__loader">
+                            <div class="activity__loader-spinner"></div>
+                            <span>Loading activity...</span>
+                        </div>
+                    </div>
+                    <div class="activity__legend">
+                        <span>Less</span>
+                        <div class="activity__legend-items">
+                            <span class="activity__legend-item" data-level="0"></span>
+                            <span class="activity__legend-item" data-level="1"></span>
+                            <span class="activity__legend-item" data-level="2"></span>
+                            <span class="activity__legend-item" data-level="3"></span>
+                            <span class="activity__legend-item" data-level="4"></span>
+                        </div>
+                        <span>More</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="contributors" id="contributors">
+            <div class="contributors__container">
+                <header class="contributors__header">
+                    <span class="contributors__label">The Team</span>
+                    <h2 class="contributors__title">Contributors</h2>
+                    <p class="contributors__subtitle">
+                        The brilliant minds behind our projects
+                    </p>
+                </header>
+                <div class="contributors__grid" id="contributorsGrid">
+                    <div class="contributors__loader">
+                        <div class="contributors__loader-spinner"></div>
+                        <span>Loading contributors...</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="footer__container">
+            <div class="footer__brand">
+                <a href="#" class="footer__logo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg>
+                    <span>AI-Develops</span>
+                </a>
+                <p class="footer__tagline">Open source, open minds, infinite possibilities.</p>
+            </div>
+            <div class="footer__links">
+                <div class="footer__column">
+                    <h4>Navigation</h4>
+                    <a href="#projects">Projects</a>
+                    <a href="#activity">Activity</a>
+                    <a href="#contributors">Contributors</a>
+                </div>
+                <div class="footer__column">
+                    <h4>Connect</h4>
+                    <a href="https://github.com/AI-Develops" target="_blank" rel="noopener">GitHub</a>
+                    <a href="https://github.com/AI-Develops" target="_blank" rel="noopener">Discussions</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer__bottom">
+            <p>Built with 
+                <svg class="footer__heart" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                </svg> 
+                by AI-Develops
+            </p>
+            <p class="footer__year">&copy; 2024 AI-Develops. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
