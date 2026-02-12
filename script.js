@@ -1,12 +1,13 @@
 /**
  * AI-Develops Organization Index
- * GitHub API Integration with Per-Contributor Activity
+ * GitHub API Integration with LocalStorage Caching
  */
 
 const CONFIG = {
     org: 'AI-Develops',
     apiBase: 'https://api.github.com',
-    cacheDuration: 5 * 60 * 1000,
+    cacheKeyPrefix: 'ai-develops-cache:',
+    cacheDuration: 10 * 60 * 1000, // 10 minutes
 };
 
 const state = {
@@ -16,6 +17,8 @@ const state = {
     allActivity: new Map(),
     stats: { repos: 0, contributors: 0, commits: 0 },
     selectedContributor: 'all',
+    isLoading: false,
+    lastFetch: null,
 };
 
 const elements = {
@@ -84,37 +87,173 @@ const Navigation = {
 };
 
 // ============================================
-// GitHub API with Caching
+// LocalStorage Cache Manager
+// ============================================
+const CacheManager = {
+    getKey(endpoint) {
+        return `${CONFIG.cacheKeyPrefix}${endpoint}`;
+    },
+
+    get(endpoint) {
+        try {
+            const key = this.getKey(endpoint);
+            const cached = localStorage.getItem(key);
+            
+            if (!cached) return null;
+            
+            const { data, timestamp } = JSON.parse(cached);
+            const age = Date.now() - timestamp;
+            
+            // Return data regardless of age (we'll check freshness separately)
+            return { data, timestamp, age, isStale: age > CONFIG.cacheDuration };
+        } catch (e) {
+            console.warn('Cache read error:', e);
+            return null;
+        }
+    },
+
+    set(endpoint, data) {
+        try {
+            const key = this.getKey(endpoint);
+            const payload = {
+                data,
+                timestamp: Date.now(),
+            };
+            localStorage.setItem(key, JSON.stringify(payload));
+        } catch (e) {
+            console.warn('Cache write error:', e);
+            // If localStorage is full, clear old cache
+            this.clearOld();
+        }
+    },
+
+    clearOld() {
+        try {
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key?.startsWith(CONFIG.cacheKeyPrefix)) {
+                    const cached = JSON.parse(localStorage.getItem(key) || '{}');
+                    if (Date.now() - (cached.timestamp || 0) > CONFIG.cacheDuration * 6) {
+                        keysToRemove.push(key);
+                    }
+                }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+        } catch (e) {
+            console.warn('Cache cleanup error:', e);
+        }
+    },
+
+    clear() {
+        try {
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key?.startsWith(CONFIG.cacheKeyPrefix)) {
+                    keysToRemove.push(key);
+                }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key));
+        } catch (e) {
+            console.warn('Cache clear error:', e);
+        }
+    },
+};
+
+// ============================================
+// GitHub API with LocalStorage Caching
 // ============================================
 const GitHubAPI = {
-    cache: new Map(),
+    rateLimited: false,
 
-    async fetch(endpoint) {
+    async fetch(endpoint, forceRefresh = false) {
         const url = `${CONFIG.apiBase}${endpoint}`;
-        const cached = this.cache.get(url);
         
-        if (cached && Date.now() - cached.time < CONFIG.cacheDuration) {
+        // Check cache first
+        const cached = CacheManager.get(endpoint);
+        
+        // If we're rate-limited, always return cached data
+        if (this.rateLimited && cached) {
+            console.info(`[Cache] Using cached data for ${endpoint} (rate limited)`);
+            return cached.data;
+        }
+        
+        // Return fresh cache if available and not forcing refresh
+        if (cached && !cached.isStale && !forceRefresh) {
+            console.info(`[Cache] Using fresh cache for ${endpoint}`);
+            return cached.data;
+        }
+        
+        // We have stale cache - use it but try to refresh in background
+        if (cached && cached.isStale) {
+            console.info(`[Cache] Using stale cache, will refresh: ${endpoint}`);
+            // Try to refresh but don't wait
+            this.refreshInBackground(endpoint, url);
             return cached.data;
         }
 
+        // No cache - must fetch
         try {
-            const response = await fetch(url, {
-                headers: { 'Accept': 'application/vnd.github.v3+json' }
-            });
-            
-            if (!response.ok) {
-                // Return cached data even if expired on error
-                if (cached) return cached.data;
-                throw new Error(`HTTP ${response.status}`);
-            }
-            
-            const data = await response.json();
-            this.cache.set(url, { data, time: Date.now() });
+            const data = await this.doFetch(url);
+            CacheManager.set(endpoint, data);
             return data;
         } catch (error) {
-            console.warn(`GitHub API: ${error.message}`);
-            return cached?.data || null;
+            console.error(`[API] Fetch failed: ${error.message}`);
+            return null;
         }
+    },
+
+    async refreshInBackground(endpoint, url) {
+        try {
+            const data = await this.doFetch(url);
+            if (data) {
+                CacheManager.set(endpoint, data);
+            }
+        } catch (error) {
+            // Silently fail - we already have stale data
+        }
+    },
+
+    async doFetch(url) {
+        const response = await fetch(url, {
+            headers: {
+                'Accept': 'application/vnd.github.v3+json',
+            },
+        });
+
+        if (response.status === 403) {
+            // Check if it's a rate limit issue
+            const rateLimit = response.headers.get('X-RateLimit-Remaining');
+            const rateLimitReset = response.headers.get('X-RateLimit-Reset');
+            
+            if (rateLimit === '0' || rateLimitReset) {
+                this.rateLimited = true;
+                const resetTime = rateLimitReset ? new Date(parseInt(rateLimitReset) * 1000) : null;
+                console.warn(
+                    `[API] Rate limited. Reset at: ${resetTime?.toLocaleTimeString() || 'unknown'}`
+                );
+                
+                // Reset rate limit flag after reset time
+                if (rateLimitReset) {
+                    const waitTime = (parseInt(rateLimitReset) * 1000) - Date.now() + 1000;
+                    if (waitTime > 0 && waitTime < 3600000) { // Max 1 hour
+                        setTimeout(() => {
+                            this.rateLimited = false;
+                            console.info('[API] Rate limit reset');
+                        }, waitTime);
+                    }
+                }
+            }
+            throw new Error('Rate limited (403)');
+        }
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        this.rateLimited = false;
+        return await response.json();
     },
 
     async getRepos() {
@@ -123,14 +262,8 @@ const GitHubAPI = {
     },
 
     async getContributorsWithStats(repo) {
-        // This endpoint gives us per-contributor weekly activity
         const stats = await this.fetch(`/repos/${CONFIG.org}/${repo}/stats/contributors`);
         return stats || [];
-    },
-
-    async getCommitActivity(repo) {
-        const activity = await this.fetch(`/repos/${CONFIG.org}/${repo}/stats/commit-activity`);
-        return activity || [];
     },
 };
 
@@ -177,7 +310,14 @@ const ProjectsSection = {
         if (repos.length === 0) {
             elements.projectsGrid.innerHTML = `
                 <div class="projects__loader">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:48px;height:48px;color:var(--color-text-muted)">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 8v4M12 16h.01"/>
+                    </svg>
                     <p>No repositories found</p>
+                    <p style="font-size:var(--text-xs);color:var(--color-text-muted)">
+                        ${GitHubAPI.rateLimited ? 'API rate limited - showing cached data' : ''}
+                    </p>
                 </div>
             `;
             return;
@@ -268,6 +408,14 @@ const ActivitySection = {
         const allActivityMap = new Map();
         let totalCommits = 0;
 
+        // Show loading state
+        elements.activityGraph.innerHTML = `
+            <div class="activity__loader">
+                <div class="activity__loader-spinner"></div>
+                <span>Loading contributor activity...</span>
+            </div>
+        `;
+
         // Fetch contributor stats for each repo
         for (const repo of state.repos) {
             const contributorStats = await GitHubAPI.getContributorsWithStats(repo.name);
@@ -280,7 +428,6 @@ const ActivitySection = {
                 const login = stat.author.login;
                 const avatar = stat.author.avatar_url;
                 
-                // Initialize contributor if needed
                 if (!contributorMap.has(login)) {
                     contributorMap.set(login, {
                         login,
@@ -292,18 +439,15 @@ const ActivitySection = {
                 
                 const contributor = contributorMap.get(login);
                 
-                // Process weekly data
                 if (stat.weeks && Array.isArray(stat.weeks)) {
                     stat.weeks.forEach(week => {
                         if (week.w && week.c > 0) {
                             const date = new Date(week.w * 1000);
                             const dateStr = date.toISOString().split('T')[0];
                             
-                            // Add to contributor's activity
                             const currentContrib = contributor.activity.get(dateStr) || 0;
                             contributor.activity.set(dateStr, currentContrib + week.c);
                             
-                            // Add to total activity
                             const currentAll = allActivityMap.get(dateStr) || 0;
                             allActivityMap.set(dateStr, currentAll + week.c);
                             
@@ -315,7 +459,6 @@ const ActivitySection = {
             });
         }
 
-        // Sort contributors by contributions
         state.contributors = Array.from(contributorMap.values())
             .sort((a, b) => b.contributions - a.contributions);
         
@@ -331,14 +474,12 @@ const ActivitySection = {
 
     populateContributorSelect() {
         const select = elements.contributorSelect;
-        
-        // Keep "All" option, add contributors
         select.innerHTML = '<option value="all">All Contributors</option>';
         
         state.contributors.forEach(c => {
             const option = document.createElement('option');
             option.value = c.login;
-            option.textContent = `${c.login} (${c.contributions})`;
+            option.textContent = `${c.login} (${c.contributions.toLocaleString()})`;
             select.appendChild(option);
         });
 
@@ -358,7 +499,6 @@ const ActivitySection = {
     render() {
         const activityData = this.getActivityData();
         
-        // Calculate stats for current selection
         let totalContributions = 0;
         let activeDays = 0;
         
@@ -367,11 +507,9 @@ const ActivitySection = {
             if (count > 0) activeDays++;
         });
 
-        // Update summary
         elements.totalContributions.textContent = totalContributions.toLocaleString();
         elements.activeDays.textContent = activeDays.toLocaleString();
 
-        // Generate graph
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
@@ -380,7 +518,6 @@ const ActivitySection = {
         let currentMonth = -1;
         let monthPositions = [];
 
-        // Generate 52 weeks (364 days)
         for (let w = 51; w >= 0; w--) {
             const weekData = [];
             
@@ -390,7 +527,6 @@ const ActivitySection = {
                 const dateStr = date.toISOString().split('T')[0];
                 const count = activityData.get(dateStr) || 0;
                 
-                // Track month
                 const month = date.getMonth();
                 if (month !== currentMonth && w < 51) {
                     currentMonth = month;
@@ -411,7 +547,6 @@ const ActivitySection = {
             weeks.push(weekData);
         }
 
-        // Render months header
         const uniqueMonths = [];
         let lastMonthName = '';
         weeks.forEach((_, weekIndex) => {
@@ -429,7 +564,27 @@ const ActivitySection = {
             .map(m => `<span class="activity__month">${m}</span>`)
             .join('');
 
-        // Render graph
+        // Check if we have any data
+        const hasData = activityData.size > 0;
+        
+        if (!hasData) {
+            elements.activityGraph.innerHTML = `
+                <div class="activity__loader" style="grid-column:1/-1">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:32px;height:32px;color:var(--color-text-muted)">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                    </svg>
+                    <span>No activity data available</span>
+                    <span style="font-size:var(--text-xs);color:var(--color-text-muted)">
+                        ${GitHubAPI.rateLimited ? 'API rate limited - cached data may be empty or stale' : 'Activity will appear here once commits are made'}
+                    </span>
+                </div>
+            `;
+            return;
+        }
+
         elements.activityGraph.innerHTML = weeks.map(week => `
             <div class="activity__week">
                 ${week.map(day => `
@@ -461,7 +616,13 @@ const ContributorsSection = {
         if (state.contributors.length === 0) {
             elements.contributorsGrid.innerHTML = `
                 <div class="contributors__loader">
-                    <p>No contributors found</p>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:32px;height:32px;color:var(--color-text-muted)">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                        <circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                    <span>No contributors found</span>
                 </div>
             `;
             return;
@@ -524,21 +685,103 @@ const StatsDisplay = {
 };
 
 // ============================================
+// Rate Limit Status Indicator
+// ============================================
+const RateLimitIndicator = {
+    init() {
+        this.container = document.createElement('div');
+        this.container.className = 'rate-limit-indicator';
+        this.container.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            background: var(--color-bg-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-lg);
+            font-size: var(--text-xs);
+            color: var(--color-text-secondary);
+            z-index: 1000;
+            display: none;
+            box-shadow: var(--shadow-lg);
+        `;
+        document.body.appendChild(this.container);
+    },
+
+    show(message, type = 'warning') {
+        this.container.textContent = message;
+        this.container.style.display = 'block';
+        
+        if (type === 'warning') {
+            this.container.style.borderColor = 'var(--color-warning)';
+        } else if (type === 'error') {
+            this.container.style.borderColor = 'var(--color-error)';
+        }
+    },
+
+    hide() {
+        this.container.style.display = 'none';
+    },
+};
+
+// ============================================
 // Initialize
 // ============================================
 async function init() {
     ThemeManager.init();
     Navigation.init();
     ProjectsSection.init();
+    RateLimitIndicator.init();
+
+    // Clear old cache entries on start
+    CacheManager.clearOld();
 
     try {
+        // Load projects first
         await ProjectsSection.load();
+        
+        // Check if we got rate limited
+        if (GitHubAPI.rateLimited) {
+            RateLimitIndicator.show('API rate limited - showing cached data', 'warning');
+        }
+        
+        // Then load activity data
         await ActivitySection.load();
         ContributorsSection.render();
+        
+        // Hide indicator if we have data
+        if (state.repos.length > 0 || state.contributors.length > 0) {
+            setTimeout(() => RateLimitIndicator.hide(), 3000);
+        }
+        
     } catch (error) {
         console.error('Initialization error:', error);
+        RateLimitIndicator.show('Failed to load data - please try again later', 'error');
     }
 }
+
+// Add debug helpers to window (remove in production)
+window.clearAIDevelopsCache = () => {
+    CacheManager.clear();
+    console.log('Cache cleared');
+};
+
+window.getAIDevelopsCacheStatus = () => {
+    const status = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith(CONFIG.cacheKeyPrefix)) {
+            const cached = JSON.parse(localStorage.getItem(key) || '{}');
+            status.push({
+                key: key.replace(CONFIG.cacheKeyPrefix, ''),
+                age: Math.round((Date.now() - (cached.timestamp || 0)) / 1000 / 60) + ' min ago',
+                stale: (Date.now() - (cached.timestamp || 0)) > CONFIG.cacheDuration,
+            });
+        }
+    }
+    console.table(status);
+    return status;
+};
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
