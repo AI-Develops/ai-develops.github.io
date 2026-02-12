@@ -50,8 +50,7 @@
     <main>
         <section class="hero">
             <div class="hero__bg">
-                <div class="hero__gradient"></div>
-                <canvas id="heroCanvas"></canvas>
+                <div class="hero__pattern"></div>
             </div>
             <div class="hero__content">
                 <div class="hero__badge">
@@ -138,12 +137,41 @@
                         Real-time visualization of commits across all repositories
                     </p>
                 </header>
+                
+                <div class="activity__controls">
+                    <div class="activity__select-wrapper">
+                        <label for="contributorSelect" class="activity__select-label">Contributor:</label>
+                        <select id="contributorSelect" class="activity__select">
+                            <option value="all">All Contributors</option>
+                        </select>
+                    </div>
+                    <div class="activity__summary" id="activitySummary">
+                        <span class="activity__summary-item">
+                            <strong id="totalContributions">0</strong> contributions
+                        </span>
+                        <span class="activity__summary-item">
+                            <strong id="activeDays">0</strong> active days
+                        </span>
+                    </div>
+                </div>
+                
                 <div class="activity__graph-container">
                     <div class="activity__months" id="activityMonths"></div>
-                    <div class="activity__graph" id="activityGraph">
-                        <div class="activity__loader">
-                            <div class="activity__loader-spinner"></div>
-                            <span>Loading activity...</span>
+                    <div class="activity__days-labels">
+                        <span>Sun</span>
+                        <span>Mon</span>
+                        <span>Tue</span>
+                        <span>Wed</span>
+                        <span>Thu</span>
+                        <span>Fri</span>
+                        <span>Sat</span>
+                    </div>
+                    <div class="activity__graph-wrapper">
+                        <div class="activity__graph" id="activityGraph">
+                            <div class="activity__loader">
+                                <div class="activity__loader-spinner"></div>
+                                <span>Loading activity...</span>
+                            </div>
                         </div>
                     </div>
                     <div class="activity__legend">
